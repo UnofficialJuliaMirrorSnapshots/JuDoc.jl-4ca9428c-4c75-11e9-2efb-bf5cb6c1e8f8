@@ -9,7 +9,9 @@ The base syntax is plain markdown with a few extensions such as the ability to d
 
 See [the docs](https://tlienart.github.io/JuDoc.jl/stable) for more information.
 
-See [my website](https://tlienart.github.io) to see how things could look.
+A couple of websites using JuDoc:
+* [@cormullion's website](https://cormullion.github.io), the author of [Luxor.jl](https://github.com/JuliaGraphics/Luxor.jl),
+* [my website](https://tlienart.github.io).
 
 ### Quick demo
 
@@ -36,6 +38,12 @@ julia> serve()
 ```
 
 You can now modify the files in `MyNewSite/src` and see the changes being live-rendered in your browser.
+Head to [the docs](https://tlienart.github.io/JuDoc.jl/stable) for more information.
+
+## Associated repositories
+
+* [LiveServer.jl](https://github.com/asprionj/LiveServer.jl) a package coded with [Jonas Asprion](https://github.com/asprionj) to render and watch the content of a local folder in the browser.
+* [JuDocTemplates.jl](https://github.com/tlienart/JuDocTemplates.jl) the repositories where JuDoc themes/templates are developed.
 
 ## Licenses
 
