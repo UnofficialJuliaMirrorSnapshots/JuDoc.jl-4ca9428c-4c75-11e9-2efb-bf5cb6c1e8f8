@@ -234,7 +234,7 @@ function resolve_input_plotoutput(fname::AbstractString, id::AbstractString=""):
     for (root, _, files) ∈ walkdir(outdir)
         for (f, e) ∈ splitext.(files)
             lc_e = lowercase(e)
-            if fn == f && lc_e ∈ [".gif", ".jpg", ".jpeg", ".png", ".svg"]
+            if fn == f && lc_e ∈ (".gif", ".jpg", ".jpeg", ".png", ".svg")
                 fp = f * lc_e
                 break
             end
@@ -242,7 +242,7 @@ function resolve_input_plotoutput(fname::AbstractString, id::AbstractString=""):
         fp == "" || break
     end
     fp != "" || throw(ErrorException("I found an input command but not a relevant output plot."))
-    return "<img src=\"assets/scripts/output/$(joinpath(d, fp))\" id=\"judoc-out-plot\"/>"
+    return "<img src=\"/assets/scripts/output/$(joinpath(d, fp))\" id=\"judoc-out-plot\"/>"
 end
 
 """

@@ -72,11 +72,31 @@ function find_all_ocblocks(tokens::Vector{Token},
                           inmath=false) where S <: Symbol
 
     ocbs_all = Vector{OCBlock}()
-    for (name, (ocpair, nest)) ∈ ocblist
+    for (name, (ocpair, nestable)) ∈ ocblist
         ocbs, tokens = find_ocblocks(tokens, name, ocpair;
-                                     nestable=nest, inmath=inmath)
+                                     nestable=nestable, inmath=inmath)
         append!(ocbs_all, ocbs)
     end
+
+    # it may happen that a block is contained in a larger escape block.
+    # For instance this can happen if there is a code block in an escape block (see e.g. #151).
+    # To fix this, we browse the escape blocks in backwards order and check if there is any other
+    # block within it.
+    i = length(ocbs_all)
+    active = ones(Bool, i)
+    all_heads = from.(ocbs_all)
+    while i > 1
+        cur_ocb = ocbs_all[i]
+        if active[i] && cur_ocb.name ∈ MD_OCB_ESC
+            # find all blocks within the span of this block, deactivate all of them
+            cur_head = all_heads[i]
+            cur_tail = to(cur_ocb)
+            mask = filter(j -> active[j] && cur_head < all_heads[j] < cur_tail, 1:i-1)
+            active[mask] .= false
+        end
+        i -= 1
+    end
+    deleteat!(ocbs_all, map(!, active))
     return ocbs_all, tokens
 end
 
