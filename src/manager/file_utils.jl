@@ -14,7 +14,7 @@ function process_config()::Nothing
         @warn "I didn't find a config file. Ignoring."
     end
 
-    if JD_GLOB_VARS["codetheme"][1] !== nothing
+    if JD_GLOB_VARS["codetheme"].first !== nothing
         path = joinpath(JD_PATHS[:out_css], "highlight.css")
         # NOTE: will overwrite (every time config.md is modified)
         isdir(JD_PATHS[:out_css]) || mkpath(JD_PATHS[:out_css])
@@ -33,15 +33,20 @@ Take a path to an input markdown file (via `root` and `file`), then construct th
 page (inserting `head`, `pg_foot` and `foot`) and finally write it at the appropriate place.
 """
 function write_page(root::String, file::String, head::String, pg_foot::String, foot::String;
-                    prerender::Bool=false)::Nothing
+                    prerender::Bool=false, isoptim::Bool=false)::Nothing
     # 0. create a dictionary with all the variables available to the page
     # 1. read the markdown into string, convert it and extract definitions
     # 2. eval the definitions and update the variable dictionary, also retrieve
     # document variables (time of creation, time of last modif) and add those
     # to the dictionary.
     jd_vars = merge(JD_GLOB_VARS, copy(JD_LOC_VARS))
-    fpath = joinpath(root, file)
-    vJD_GLOB_LXDEFS = collect(values(JD_GLOB_LXDEFS))
+    fpath   = joinpath(root, file)
+     # The curpath is the relative path starting after /src/ so for instance:
+     # f1/blah/page1.md or index.md etc... this is useful in the code evaluation and management
+     # of paths
+    JD_CURPATH[] = fpath[lastindex(JD_PATHS[:in])+2:end]
+
+    vJD_GLOB_LXDEFS    = collect(values(JD_GLOB_LXDEFS))
     (content, jd_vars) = convert_md(read(fpath, String) * EOS, vJD_GLOB_LXDEFS)
 
     # adding document variables to the dictionary
@@ -51,9 +56,7 @@ function write_page(root::String, file::String, head::String, pg_foot::String, f
     s = stat(fpath)
     set_var!(jd_vars, "jd_ctime", jd_date(unix2datetime(s.ctime)))
     set_var!(jd_vars, "jd_mtime", jd_date(unix2datetime(s.mtime)))
-    relpath = fpath[lastindex(JD_PATHS[:in])+2:end] # f1/blah/page1.md or index.md etc...
-    set_var!(jd_vars, "jd_rpath", relpath)
-    JD_CURPATH[] = relpath
+    set_var!(jd_vars, "jd_rpath", JD_CURPATH[])
 
     # 3. process blocks in the html infra elements based on `jd_vars`
     # (e.g.: add the date in the footer)
@@ -74,6 +77,10 @@ function write_page(root::String, file::String, head::String, pg_foot::String, f
         end
         # remove katex scripts TODO: needs to be documented
         pg = replace(pg, r"<script.*?(?:katex\.min\.js|auto-render\.min\.js|renderMathInElement).*?<\/script>"=>"")
+    end
+
+    if !isempty(JD_GLOB_VARS["prepath"].first) && isoptim
+        pg = fix_links(pg)
     end
 
     # 5. write the html file where appropriate
@@ -114,13 +121,13 @@ caught in `process_file(args...)`.
 """
 function process_file_err(case::Symbol, fpair::Pair{String, String}, head::AbstractString="",
                           pg_foot::AbstractString="", foot::AbstractString="", t::Float64=0.;
-                          clear::Bool=false, prerender::Bool=false)::Nothing
+                          clear::Bool=false, prerender::Bool=false, isoptim::Bool=false)::Nothing
     if case == :md
-        write_page(fpair..., head, pg_foot, foot; prerender=prerender)
+        write_page(fpair..., head, pg_foot, foot; prerender=prerender, isoptim=isoptim)
     elseif case == :html
         fpath = joinpath(fpair...)
         raw_html = read(fpath, String)
-        proc_html = convert_html(raw_html, JD_GLOB_VARS, fpath)
+        proc_html = convert_html(raw_html, JD_GLOB_VARS, fpath; isoptim=isoptim)
         write(joinpath(out_path(fpair.first), fpair.second), proc_html)
     elseif case == :other
         opath = joinpath(out_path(fpair.first), fpair.second)
@@ -156,3 +163,16 @@ Convenience function to assemble the html out of its parts.
 """
 build_page(head::String, content::String, pg_foot::String, foot::String)::String =
     "$head\n<div class=\"jd-content\">\n$content\n$pg_foot\n</div>\n$foot"
+
+
+"""
+$(SIGNATURES)
+
+for a project website, for instance `username.github.io/project/` all paths should eventually
+be pre-prended with `/project/`. This would happen just before you publish the website.
+"""
+function fix_links(pg::String)::String
+    pp = strip(JD_GLOB_VARS["prepath"].first, '/')
+    ss = SubstitutionString("\\1=\"/$(pp)/")
+    return replace(pg, r"(src|href)\s*?=\s*?\"\/" => ss)
+end
