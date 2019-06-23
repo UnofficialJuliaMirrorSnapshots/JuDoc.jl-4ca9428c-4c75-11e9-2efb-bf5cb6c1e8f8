@@ -37,7 +37,18 @@ include("converter/lx_input.jl")
 println("🍺")
 
 println("INTEGRATION")
-include("converter/integration.jl")
-println("PRE-RENDERING")
-include("converter/js_prerender.jl")
+include("global/utils.jl")
+include("global/cases1.jl")
+include("global/cases2.jl")
+
+begin
+    # create temp dir to do complete integration testing (has to be here in order
+    # to locally play nice with node variables etc, otherwise it's a big headache)
+    p = normpath(joinpath(D, "..", "__tmp"));
+    isdir(p) && rm(p, recursive=true, force=true)
+    mkdir(p); cd(p)
+    include("global/postprocess.jl");
+    cd(".."); rm(p, recursive=true, force=true)
+end
+
 println("🥳  🥳  🥳  🥳 ")
