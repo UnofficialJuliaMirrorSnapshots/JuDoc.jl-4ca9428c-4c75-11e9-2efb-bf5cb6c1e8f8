@@ -6,6 +6,7 @@ const D = joinpath(dirname(dirname(pathof(JuDoc))), "test", "_dummies")
 # otherwise you may get an error like "key 0x099191234..." was not found or
 # saying that the key :in doesn't exist or something along those lines
 include("jd_paths_vars.jl")
+include("test_utils.jl")
 
 include("misc.jl")
 
@@ -33,22 +34,26 @@ include("converter/html.jl")
 println("🍺")
 
 println("CONVERTER/LX")
+include("converter/eval.jl")
 include("converter/lx_input.jl")
+include("converter/lx_simple.jl")
 println("🍺")
 
 println("INTEGRATION")
-include("global/utils.jl")
 include("global/cases1.jl")
 include("global/cases2.jl")
 
 begin
     # create temp dir to do complete integration testing (has to be here in order
     # to locally play nice with node variables etc, otherwise it's a big headache)
-    p = normpath(joinpath(D, "..", "__tmp"));
-    isdir(p) && rm(p, recursive=true, force=true)
-    mkdir(p); cd(p)
-    include("global/postprocess.jl");
-    cd(".."); rm(p, recursive=true, force=true)
+    p = joinpath(D, "..", "__tmp");
+    # after errors, this may not have been deleted properly
+    isdir(p) && rm(p; recursive=true, force=true)
+    # make dir, go in it, do the tests, then get completely out (otherwise windows
+    # can't delete the folder)
+    mkdir(p); cd(p); include("global/postprocess.jl");  cd(joinpath(D, ".."))
+    # clean up
+    rm(p; recursive=true, force=true)
 end
-
-println("🥳  🥳  🥳  🥳 ")
+cd(dirname(dirname(pathof(JuDoc))))
+println("😅 😅 😅 😅")

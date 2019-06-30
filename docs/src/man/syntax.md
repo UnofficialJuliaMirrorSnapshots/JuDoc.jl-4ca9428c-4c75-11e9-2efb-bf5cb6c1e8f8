@@ -27,7 +27,8 @@ Most of what is presented here is also shown in that example.
     * [Inserting code](#Inserting-code-1)
     * [Plain-text output](#Plain-text-output-1)
     * [Plot output](#Plot-output-1)
-    * [Slicing up](#Slicing-up-1)  
+    * [Slicing up](#Slicing-up-1)
+* [File insertions](#File-insertions-1)
 * [Page variables](#Page-variables-1)
   * [Local page variables](#Local-page-variables-1)
     * [Default variables](#Default-variables-1)
@@ -276,14 +277,15 @@ However, if you would like to define commands that are _globally_ available to a
 
 ### Hyper-references
 
-Currently two types of hyper-references are supported:
+Three types of hyper-references are supported:
 
-* for display math, and
-* for bibliography references.
+* for display math,
+* for bibliography references,
+* for specific anchor points in the page.
 
-The syntax for both is close to that of standard LaTeX (see below).
+The syntax for all three is close to that of standard LaTeX (see below).
 
-To style the appearance of the links in CSS, use `.jd-content.eqref a` and `.jd-content.bibref a` classes; for instance:
+To style the appearance of the maths or bib links in CSS, use `.jd-content.eqref a` and `.jd-content.bibref a` classes; for instance:
 
 ```css
 .jd-content .eqref a  {color: blue;}
@@ -335,6 +337,40 @@ As in LaTeX, if the reference is undefined, the command will be replaced by **(?
     In the future, there may be a possibility to define specific bibliography styles.
     I've not yet come around to it but feel free to open an issue if you would like this or would like to suggest a way to do it.
 
+#### Anchor points
+
+You can specify anchor points on the page by using `\label{name of the anchor}` anywhere on the page outside of maths environment.
+This will insert an anchor:
+
+```html
+<a id="name-of-the-anchor"></a>
+```
+
+You can subsequently add a link to it on the same page:
+
+```judoc
+[link to it](#name-of-the-anchor)
+```
+
+or from another page by prepending it with the path to the page, for instance:
+
+```judoc
+[link to it](/index.html#name-of-the-anchor)
+```
+
+Note also that all section headers are anchor points for instance
+
+```judoc
+### Some subtitle
+```
+
+can be linked to with `#some-subtitle`.
+
+!!! note
+
+    In the future, a number will be appended to anchor-points corresponding to section headers so that if you have two headers with the same name, the links can be differentiated (issue [#180](https://github.com/tlienart/JuDoc.jl/issues/180)). (Same as Documenter.jl.)
+
+
 ## Code insertions
 
 Sometimes, when presenting code in a post, you would like to make sure the code works and it can be annoying to have to copy-paste it around then copy its output, especially if you decide to make modifications on the way in which case you have to repeat the process.
@@ -342,21 +378,21 @@ Sometimes, when presenting code in a post, you would like to make sure the code 
 In JuDoc there are two ways to do this.
 
 1. For Julia, a live-evaluation of code blocks is supported not unlike the [Weave.jl](https://github.com/mpastell/Weave.jl) package,
-1. For all language, you can run the script separately and insert the code and/or the output of the code in the page.
+1. For all languages, you can run the script separately and insert the code and/or the output of the code in the page.
 
 ### On-the-fly evaluation
 
 !!! note
 
     **Evaluation time**: it is important to realise that when the code block is created or modified and the page is saved, it will trigger a page compilation that will _wait_ for the evaluation of the code block to complete. So if your code block takes a long time to execute, the page will not be updated before that's done.
-    That being said, if you don't modify the code block, it will only be executed _once_ as the output is saved to file.
+    That being said, if you don't modify the code block, it will only be executed **once** as the output is saved to file.
 
 !!! note
 
     **Sandboxing**: on-the-fly evaluation of code blocks is still a bit experimental. Among other things, the code is _not sandboxed_ which means that if you have two code blocks one after the other, the second one has access to what's defined in the first. This is natural within the same page, but it also works _across_ pages. However it would be really bad practice to rely on this as the order in which pages are compiled is not always the same.
     In short: take a page as one Julia notebook and pay attention to all your variables and functions to be defined on that page.
 
-Code blocks that should not be evaluated should be added without anything special so for instance:
+Code blocks that should not be evaluated should be added as per standard markdown, so for instance:
 
 `````judoc
 ```julia
@@ -364,7 +400,7 @@ a = 10
 ```
 `````
 
-Code blocks that should be evaluated should be added with `julia:path/to/script` where `path/to/script` indicates _where_ the script corresponding to the code block will be saved.
+Code blocks that should be evaluated should be added with `julia:path/to/script` where `path/to/script` indicates _where_ the script corresponding to the code block will be saved (**note**: the given path _must_ be in UNIX format)
 
 `````judoc
 ```julia:./code/ex1
@@ -379,7 +415,7 @@ What this will do is:
 1. run the code and capture its output (`STDOUT`) and write it to `/assets/[subpath]/code/output/ex1.out`
 
 The `[subpath]` here is the _exact same sub-path structure_ than to the page where the code block is inserted.
-So to clarify, let's say you wrote the above code-block in
+To clarify, let's say you wrote the above code-block in
 
 ```
 /src/pages/folder1/page1.md
@@ -395,15 +431,15 @@ then with the syntax above, the script will be saved in
 
 There are three ways you can specify where the script corresponding to a code-block should be saved.
 
-1. `./[p]/script` is as above, it will write the code block to `/assets/[subpath]/p/script.jl` where `subpath` corresponds to the sub-path of the page where the code block is inserted (path below `/src/`)
-1. `p/script` will write the code block to `/assets/p/script.jl`
-1. `/p/script` will write the code block to `/p/script.jl`
+1. relative to the page: `./[p]/script` is as above, it will write the code block to `/assets/[subpath]/p/script.jl` where `subpath` corresponds to the sub-path of the page where the code block is inserted (path below `/src/`)
+1. relative to the assets dir: `p/script` will write the code block to `/assets/p/script.jl`
+1. full path: `/p/script` will write the code block to `/p/script.jl`
 
-**Note**: when code blocks are evaluated and their output (`STDOUT`) is captured, it saved at `[path]/output/script.out` where `[path]` is what precedes `script.jl` in the cases above.
+**Note**: when code blocks are evaluated, their output (`STDOUT`) is captured and saved at `[path]/output/script.out` where `[path]` is what precedes `script.jl` in the cases above.
 
 #### Inserting the output
 
-Ok so let's say you've added the following code block:
+Let's say you've added the following code block:
 
 `````judoc
 ```julia:./code_pg1/ex1
@@ -413,7 +449,7 @@ a = [1, 2, 3]
 ```
 `````
 
-In order to show the output, just write
+In order to show the raw output, just write
 
 ```judoc
 \output{./code_pg1/ex1}
@@ -425,7 +461,7 @@ which in the present example will introduce exactly the following HTML
 <pre><code>dot(a, a) = 14</code></pre>
 ```
 
-which will look like
+and will look like
 
 ```
 dot(a, a) = 14
@@ -433,9 +469,31 @@ dot(a, a) = 14
 
 If you now change the vector `a` in the code block, the page will be re-compiled with the code-block re-evaluated and the new output will be shown.
 
+If you would like the output to appear as text (not a code block), you can use `\textoutput` instead.
+Here's an example:
+
+`````judoc
+```julia:./code_pg1/ex2
+using Statistics
+temps = (15, 15, 14, 16, 18, 19, 20, 12, 10, 24)
+println("The _average_ temperature is **$(mean(temps))°C**.")
+```
+\textoutput{./code_pg1/ex2}
+`````
+
+Which will appear as:
+
+```julia
+using Statistics
+temps = (15, 15, 14, 16, 18, 19, 20, 12, 10, 24)
+println("The _average_ temperature is **$(mean(temps))°C**.")
+```
+
+The _average_ temperature is **16.3°C**.
+
 #### Hiding lines
 
-Sometimes you may want to run some lines but hide them from the presentation, for this just use `# hide` at the end of the line:
+Sometimes you may want to run some lines but hide them from the presentation, for this just use `# hide` at the end of the line (`hide` is not case sensitive so `# HiDe` would be fine too):
 
 `````judoc
 ```julia:./code_pg1/ex1
@@ -445,17 +503,33 @@ a = [1, 2, 3]
 ```
 `````
 
+You could also hide the entire code block if you only care about the output, for this put a `# hideall` on any line:
+
+`````judoc
+```julia:./code_pg1/ex2
+#hideall
+using Statistics
+temps = (15, 15, 14, 16, 18, 19, 20, 12, 10, 24)
+println("The _average_ temperature is **$(mean(temps))°C**.")
+```
+\textoutput{./code_pg1/ex2}
+`````
+
+Which will appear as just:
+
+The _average_ temperature is **16.3°C**.
+
 ### Separate evaluation
 
 The philosophy here is:
 
 * keep your code snippets in appropriate subfolders of `/assets/` where they can be run and their output can be saved, this can be compared to a `test/` folder in a Julia package,
-* run some or all of the snippets,
+* run some or all of the snippets (before running JuDoc),
 * use `\input{...}{...}` in your markdown (see below) and when the website is updated, it will plug-in the most recent parts that have been generated.
 
 That way, if you modify the code, everything will be updated on the website too while ensuring that the code actually runs and generates the output you're displaying.
 
-Again, the script files can contain `# hide` at the end of lines you do not want to show (`hide` is not case sensitive so `# HiDe` would be fine too).
+Again, the script files can contain `# hide` at the end of lines you do not want to show.
 
 The `generate_results.jl` file should run the scripts and redirect outputs to the `assets/[path]/output` directory.
 You can use something like the script below (if you generate an example website with [`newsite`](@ref), it's already in there) though you can of course modify it as you wish.
@@ -487,7 +561,7 @@ So for instance if you have in `assets/scripts/script1.jl`
 print("hello")
 ```
 
-Then `genplain("script1.jl")` will generate `assets/scripts/output/script1.out` with content
+Then `genplain("script1.jl")` will generate `/assets/scripts/output/script1.out` with content
 
 ```julia
 hello
@@ -505,7 +579,7 @@ In order to insert the code of a script and have it highlighted you can use
 \input{julia}{scripts/script1.jl}
 ```
 
-or `\input{code:julia}{scripts/script1.jl}`. This will insert the content of the file `assets/scripts/script1.jl` (see also the section earlier on paths) into a block that will be highlighted as julia code.
+or `\input{code:julia}{scripts/script1.jl}`. This will insert the content of the file `/assets/scripts/script1.jl` (see also the section earlier on paths) into a block that will be highlighted as julia code.
 
 #### Plain-text output
 
@@ -515,7 +589,7 @@ In order to insert the plain-text output of a script, you can use
 \input{output}{scripts/script1.jl}
 ```
 
-or `\input{output:plain}{scripts/script1.jl}`. This will insert the content of the file `assets/scripts/script1.out` into a non-highlighted code-block.
+or `\input{output:plain}{scripts/script1.jl}`. This will insert the content of the file `/assets/scripts/script1.out` into a non-highlighted code-block.
 
 #### Plot output
 
@@ -525,8 +599,8 @@ In order to insert a plot generated by a script, you can use
 \input{plot}{scripts/script1.jl}
 ```
 
-or `\input{plot:id}{scripts/script1.jl}`. This will look for an image file with root name `assets/scripts/script1.ext` where `ext` is `gif, png, jp(e)g, svg`.
-If you use `plot:id` then it will look for an image file with root name `assets/scripts/script1id.ext`.
+or `\input{plot:id}{scripts/script1.jl}`. This will look for an image file with root name `/assets/scripts/script1.ext` where `ext` is `gif, png, jp(e)g, svg`.
+If you use `plot:id` then it will look for an image file with root name `/assets/scripts/script1id.ext`.
 
 The `plot:id` option is useful if you have a script that generates several plots for instance.
 
@@ -534,6 +608,43 @@ The `plot:id` option is useful if you have a script that generates several plots
 
 The structure in the `generate_results.jl` effectively means that all your code is run as one big script.
 This also means that if you want to slice some of your code in several parts and show intermediate outputs (e.g. plots), well you can just do that by having a `script_1_p1.jl`, `script_1_p2.jl` etc. and then just use  `\input` multiple times.
+
+## File insertions
+
+A few commands are defined to help you with insertions of content; you can also define your own commands using custom HTML as was discussed before.
+
+### Inserting a figure
+
+The commands
+* `\figalt{alt}{path}`, and
+* `\fig{path}`
+are convenient commands to insert figures.
+Of course you're free to use the default markdown way `![alt](full_path)` instead.
+One difference with these commands though is that they allow the use of relative paths (see [the point on paths](#More-on-paths-1)); this can be convenient in order to organise your assets as you organise your pages.  
+
+**Note**: as sometimes figures are generated by code, it is sometimes convenient to save them in a `path/output/` subfolder.
+The `\fig` and `\figalt` will try to look both in `path` and `path/output` so that you don't have to think about it.
+Likewise, if the extension is not provided, JuDoc will try common ones.
+For instance, all of these will work:
+
+`````judoc
+```julia:./ex1
+using PyPlot
+figure()
+plot([0, 1], [0, 1])
+savefig(joinpath(@__DIR__, "output", "test.png"))
+```
+\fig{./test}
+\fig{./output/test}
+\fig{./test.png}
+`````
+
+### Linking a file
+
+The command
+* `\file{name}{path}`
+is a convenient way to link to a local asset (e.g. a pdf file).
+Again, you could use the default markdown way `[name](full_path)` but, as for the fig commands, this allows the use of relative paths.
 
 ## Page variables
 

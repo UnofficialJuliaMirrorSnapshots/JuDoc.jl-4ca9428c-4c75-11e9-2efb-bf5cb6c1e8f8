@@ -2,10 +2,6 @@
     isdir("basic") && rm("basic", recursive=true, force=true)
     newsite("basic")
 
-    if get(ENV, "CI", "false") == "true"
-        import Pkg; Pkg.add("LinearAlgebra"); using LinearAlgebra;
-    end
-
     serve(single=true)
     # ---------------
     @test all(isdir, ("assets", "css", "libs", "pub", "src"))
