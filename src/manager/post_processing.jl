@@ -31,11 +31,12 @@ function optimize(; prerender::Bool=true, minify::Bool=true, sig::Bool=false,
     end
     # re-do a (silent) full pass
     start = time()
-    print("→ Full pass")
-    withpre = ifelse(prerender, rpad(" (with pre-rendering)", 24), rpad(" (no pre-rendering)", 24))
+    fmsg = "\r→ Full pass"
+    print(fmsg)
+    withpre = fmsg * ifelse(prerender, rpad(" (with pre-rendering)", 24), rpad(" (no pre-rendering)", 24))
     print(withpre)
     succ = (serve(single=true, prerender=prerender, nomess=true, isoptim=true) === nothing)
-    time_it_took(start)
+    print_final(withpre, start)
 
     #
     # Minification
@@ -43,17 +44,18 @@ function optimize(; prerender::Bool=true, minify::Bool=true, sig::Bool=false,
     if minify && succ
         if JD_CAN_MINIFY
             start = time()
-            print(rpad("→ Minifying *.[html|css] files...", 35))
+            mmsg = rpad("→ Minifying *.[html|css] files...", 35)
+            print(mmsg)
             # copy the script to the current dir
             cp(joinpath(dirname(pathof(JuDoc)), "scripts", "minify.py"), JD_PY_MIN_NAME; force=true)
             # run it
             succ = success(`$([e for e in split(PY)]) $JD_PY_MIN_NAME`)
             # remove the script file
             rm(JD_PY_MIN_NAME)
-            time_it_took(start)
+            print_final(mmsg, start)
         else
-            @warn "I didn't find css_html_js_minify, you can install it via pip the output will "*
-                  "not be minified."
+            @warn "I didn't find css_html_js_minify, you can install it via pip."*
+                  "The output will not be minified."
         end
     end
     return ifelse(sig, succ, nothing)
@@ -73,21 +75,23 @@ In other scenarios you should probably do this manually.
 * `prerender=true`: prerender javascript before pushing see [`optimize`](@ref)
 * `minify=true`:    minify output before pushing see [`optimize`](@ref)
 * `nopass=false`:   set this to true if you have already run `optimize` manually.
+* `message="jd-update"`: add commit message.
 """
 function publish(; prerender::Bool=true, minify::Bool=true, nopass::Bool=false,
-                   prepath::String="")::Nothing
+                   prepath::String="", message::String="jd-update")::Nothing
     succ = true
     if !isempty(prepath) || !nopass
         succ = optimize(prerender=prerender, minify=minify, sig=true, prepath=prepath)
     end
     if succ
         start = time()
-        print(rpad("→ Pushing updates with git...", 35))
+        pubmsg = rpad("→ Pushing updates with git...", 35)
+        print(pubmsg)
         try
             run(`git add -A `)
-            run(`git commit -m "jd-update" --quiet`)
+            run(`git commit -m "$message" --quiet`)
             run(`git push --quiet`)
-            time_it_took(start)
+            print_final(pubmsg, start)
         catch e
             println("✘ Could not push updates, verify your connection and try manually.\n")
             @show e
@@ -109,14 +113,16 @@ function cleanpull()::Nothing
     FOLDER_PATH[] = pwd()
     set_paths!()
     if isdir(PATHS[:pub])
-        print(rpad("→ Removing local output dir...", 35))
+        rmmsg = rpad("→ Removing local output dir...", 35)
+        print(rmmsg)
         rm(PATHS[:pub], force=true, recursive=true)
-        println(" [done ✔ ]")
+        println("\r" * rmmsg * " [done ✔ ]")
     end
     try
-        print(rpad("→ Retrieving updates from the repository...", 35))
+        pmsg = rpad("→ Retrieving updates from the repository...", 35)
+        print(pmsg)
         run(`git pull --quiet`)
-        println(" [done ✔ ]")
+        println("\r" * pmsg * " [done ✔ ]")
     catch e
         println("✘ Could not pull updates, verify your connection and try manually.\n")
         @show e

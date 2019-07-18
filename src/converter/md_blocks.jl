@@ -7,6 +7,8 @@ Helper function for `convert_inter_html` that processes an extracted block given
 function convert_block(β::AbstractBlock, lxcontext::LxContext)::AbstractString
     # Return relevant interpolated string based on case
     βn = β.name
+    βn ∈  MD_HEADER     && return convert_header(β)
+    βn == :LINE_SKIP    && return "<p></p>"
     βn == :CODE_INLINE  && return md2html(β.ss, true)
     βn == :CODE_BLOCK_L && return convert_code_block(β.ss)
     βn == :CODE_BLOCK   && return md2html(β.ss)
@@ -92,6 +94,27 @@ end
 """
 $(SIGNATURES)
 
+Helper function for the case of a header block (H1, ..., H6).
+"""
+function convert_header(β::OCBlock)::String
+    hk       = lowercase(string(β.name))
+    title, _ = convert_md(content(β) * EOS; isrecursive=true, has_mddefs=false)
+    # check if the header has appeared before
+    rstitle  = refstring(title)
+    level    = parse(Int, hk[2])
+    occur    = (hv[3] for hv ∈ values(PAGE_HEADERS) if hv[2] == rstitle)
+    occur    = isempty(occur) ? 0 : maximum(occur)
+    rstitle  = ifelse(occur==0, rstitle, "$(rstitle)_$(occur+1)")
+    # save in list of headers
+    PAGE_HEADERS[length(PAGE_HEADERS)+1] = (title, rstitle, occur+1, level)
+    # return the title
+    return "<$hk><a id=\"$rstitle\" href=\"#$rstitle\">$title</a></$hk>"
+end
+
+
+"""
+$(SIGNATURES)
+
 Helper function for the code block case of `convert_block`.
 """
 function convert_code_block(ss::SubString)::String
@@ -138,8 +161,8 @@ function convert_code_block(ss::SubString)::String
             redirect_stdout(outf)  do
                 try
                     Main.include(path)
-                catch
-                    print("There was an error running the code.")
+                catch e
+                    print("There was an error running the code: $(e.error).")
                 end
             end
         end
