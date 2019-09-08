@@ -5,8 +5,7 @@ const D = joinpath(dirname(dirname(pathof(JuDoc))), "test", "_dummies")
 # NOTE this first file MUST be included before running the rest of the tests
 # otherwise you may get an error like "key 0x099191234..." was not found or
 # saying that the key :in doesn't exist or something along those lines
-include("jd_paths_vars.jl")
-include("test_utils.jl")
+include("jd_paths_vars.jl"); include("test_utils.jl")
 
 include("misc.jl")
 
@@ -51,7 +50,9 @@ begin
     isdir(p) && rm(p; recursive=true, force=true)
     # make dir, go in it, do the tests, then get completely out (otherwise windows
     # can't delete the folder)
-    mkdir(p); cd(p); include("global/postprocess.jl");  cd(joinpath(D, ".."))
+    mkdir(p); cd(p);
+    include("global/postprocess.jl");
+    cd(joinpath(D, ".."))
     # clean up
     rm(p; recursive=true, force=true)
 end

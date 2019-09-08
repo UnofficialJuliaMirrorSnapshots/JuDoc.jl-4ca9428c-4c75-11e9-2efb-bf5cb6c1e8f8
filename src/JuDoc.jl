@@ -67,6 +67,7 @@ include("parser/lx_tokens.jl")
 include("parser/lx_blocks.jl")
 # > markdown
 include("parser/md_tokens.jl")
+include("parser/md_chars.jl")
 # > html
 include("parser/html_tokens.jl")
 include("parser/html_blocks.jl")
@@ -83,6 +84,8 @@ include("converter/lx_simple.jl")
 include("converter/html_blocks.jl")
 include("converter/html_functions.jl")
 include("converter/html.jl")
+# > fighting Julia's markdown parser
+include("converter/fixer.jl")
 # > javascript
 include("converter/js_prerender.jl")
 
