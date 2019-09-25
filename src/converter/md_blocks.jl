@@ -4,18 +4,20 @@ $(SIGNATURES)
 Helper function for `convert_inter_html` that processes an extracted block given a latex context
 `lxc` and returns the processed html that needs to be plugged in the final html.
 """
-function convert_block(β::AbstractBlock, lxcontext::LxContext)::AbstractString
+function convert_block(β::AbstractBlock, lxcontext::LxContext)::AS
     # case for special characters / html entities
     β isa HTML_SPCH     && return ifelse(isempty(β.r), β.ss, β.r)
-
     # Return relevant interpolated string based on case
     βn = β.name
     βn ∈  MD_HEADER        && return convert_header(β)
-    βn == :CODE_INLINE     && return html_code_inline(content(β) |> Markdown.htmlesc)
+    βn == :CODE_INLINE     && return html_code_inline(content(β) |> htmlesc)
     βn == :CODE_BLOCK_LANG && return convert_code_block(β.ss)
     βn == :CODE_BLOCK_IND  && return convert_indented_code_block(β.ss)
-    βn == :CODE_BLOCK      && return html_code(content(β) |> Markdown.htmlesc, "{{fill lang}}")
+    βn == :CODE_BLOCK      && return html_code(strip(content(β)), "{{fill lang}}")
     βn == :ESCAPE          && return chop(β.ss, head=3, tail=3)
+    βn == :FOOTNOTE_REF    && return convert_footnote_ref(β)
+    βn == :FOOTNOTE_DEF    && return convert_footnote_def(β, lxcontext)
+    βn == :LINK_DEF        && return ""
 
     # Math block --> needs to call further processing to resolve possible latex
     βn ∈ MATH_BLOCKS_NAMES && return convert_math_block(β, lxcontext.lxdefs)
@@ -111,7 +113,7 @@ function convert_header(β::OCBlock)::String
     # save in list of headers
     PAGE_HEADERS[length(PAGE_HEADERS)+1] = (title, rstitle, occur+1, level)
     # return the title
-    return "<$hk><a id=\"$rstitle\" href=\"#$rstitle\">$title</a></$hk>"
+    return html_hk(hk, html_ahref_key(rstitle, title); id=rstitle)
 end
 
 
@@ -185,5 +187,60 @@ function convert_indented_code_block(ss::SubString)::String
     # 1. decrease indentation of all lines (either frontal \n\t or \n⎵⎵⎵⎵)
     code = replace(ss, r"\n(?:\t| {4})" => "\n")
     # 2. return; lang is a LOCAL_PAGE_VARS that is julia by default and can be set
-    return html_code(strip(code) |> Markdown.htmlesc, "{{fill lang}}")
+    return html_code(strip(code), "{{fill lang}}")
+end
+
+"""
+$(SIGNATURES)
+
+Helper function to convert a `[^1]` into a html sup object with appropriate ref and backref.
+"""
+function convert_footnote_ref(β::Token)::String
+    # β.ss is [^id]; extract id
+    id = string(match(r"\[\^(.*?)\]", β.ss).captures[1])
+    # add it to the list of refs unless it's been seen before
+    pos = 0
+    for (i, pri) in enumerate(PAGE_FNREFS)
+        if pri == id
+            pos = i
+            break
+        end
+    end
+    if pos == 0
+        push!(PAGE_FNREFS, id)
+        pos = length(PAGE_FNREFS)
+    end
+    return html_sup("fnref:$id", html_ahref(url_curpage() * "#fndef:$id", "[$pos]"; class="fnref"))
+end
+
+"""
+$(SIGNATURES)
+
+Helper function to convert a `[^1]: ...` into a html table for the def.
+"""
+function convert_footnote_def(β::OCBlock, lxcontext::LxContext)::String
+    # otok(β) is [^id]:
+    id = match(r"\[\^(.*?)\]:", otok(β).ss).captures[1]
+    pos = 0
+    for (i, pri) in enumerate(PAGE_FNREFS)
+        if pri == id
+            pos = i
+            break
+        end
+    end
+    if pos == 0
+        # this was never referenced before, so probably best not to show it
+        return ""
+    end
+    # need to process the content which could contain stuff
+    ct, _ = convert_md(content(β) * EOS, lxcontext.lxdefs;
+                       isrecursive=true, has_mddefs=false)
+    """
+    <table class="fndef" id="fndef:$id">
+        <tr>
+            <td class=\"fndef-backref\">$(html_ahref(url_curpage() * "#fnref:$id", "[$pos]"))</td>
+            <td class=\"fndef-content\">$(ct)</td>
+        </tr>
+    </table>
+    """
 end

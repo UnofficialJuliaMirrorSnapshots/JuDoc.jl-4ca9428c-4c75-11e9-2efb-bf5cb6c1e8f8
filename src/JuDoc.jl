@@ -3,8 +3,10 @@ module JuDoc
 using JuDocTemplates
 
 using Markdown
+using Markdown: htmlesc
 using Dates # see jd_vars
 using DelimitedFiles: readdlm
+using OrderedCollections
 
 import LiveServer
 
@@ -22,6 +24,9 @@ const BIG_INT = typemax(Int)
 
 """Flag for debug mode."""
 const DEBUG_MODE = Ref(false)
+
+"""Flag for error suppression mode (set and unset in optimize only)."""
+const SUPPRESS_ERR = Ref(false)
 
 """Dict to keep track of languages and how comments are indicated and their extensions."""
 const CODE_LANG = Dict{String,NTuple{2,String}}(
@@ -55,6 +60,9 @@ const PageVars = Dict{String,Pair{K,NTuple{N, DataType}} where {K, N}}
 """Relative path to the current file being processed by JuDoc."""
 const CUR_PATH = Ref("")
 
+"""Shorter name for a type that we use everywhere"""
+const AS = AbstractString
+
 # -----------------------------------------------------------------------------
 
 include("build.jl") # check if user has Node/minify
@@ -67,7 +75,7 @@ include("parser/lx_tokens.jl")
 include("parser/lx_blocks.jl")
 # > markdown
 include("parser/md_tokens.jl")
-include("parser/md_chars.jl")
+include("parser/md_validate.jl")
 # > html
 include("parser/html_tokens.jl")
 include("parser/html_blocks.jl")
