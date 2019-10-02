@@ -1,7 +1,7 @@
 name = "JuDoc"
 uuid = "4ca9428c-4c75-11e9-2efb-bf5cb6c1e8f8"
 authors = ["Thibaut Lienart <tlienart@me.com>"]
-version = "0.3.2"
+version = "0.3.3"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -17,7 +17,7 @@ Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 DocStringExtensions = ">= 0.7.0"
 JuDocTemplates = ">= 0.1.0"
 LiveServer = ">= 0.3.0"
-julia = "^1.0.0"
+julia = "^1.1.0"
 
 [extras]
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
