@@ -22,9 +22,46 @@ when JuDoc is started.
     GLOBAL_PAGE_VARS["author"]      = Pair("THE AUTHOR",   (String, Nothing))
     GLOBAL_PAGE_VARS["date_format"] = Pair("U dd, yyyy",   (String,))
     GLOBAL_PAGE_VARS["prepath"]     = Pair("",             (String,))
+    # these must be defined for the RSS file to be generated
+    GLOBAL_PAGE_VARS["website_title"] = Pair("",    (String,))
+    GLOBAL_PAGE_VARS["website_descr"] = Pair("",    (String,))
+    GLOBAL_PAGE_VARS["website_url"]   = Pair("",    (String,))
+    # if set to false, nothing rss will be considered
+    GLOBAL_PAGE_VARS["generate_rss"]  = Pair(true,  (Bool,))
     return nothing
 end
 
+"""
+CODE_SCOPE
+
+Page-related struct to keep track of the code blocks that have been evaluated.
+"""
+mutable struct CodeScope
+    rpaths::Vector{SubString}
+    codes::Vector{SubString}
+end
+CodeScope() = CodeScope(String[], String[])
+
+"""Convenience function to add a code block to the code scope."""
+function push!(cs::CodeScope, rpath::SubString, code::SubString)::Nothing
+    push!(cs.rpaths, rpath)
+    push!(cs.codes, code)
+    return nothing
+end
+
+"""Convenience function to (re)start a code scope."""
+function reset!(cs::CodeScope, rpath::SubString, code::SubString)::Nothing
+    cs.rpaths = [rpath]
+    cs.codes  = [code]
+    return nothing
+end
+
+"""Convenience function to clear arrays beyond an index"""
+function purgeafter!(cs::CodeScope, head::Int)::Nothing
+    cs.rpaths = cs.rpaths[1:head]
+    cs.codes  = cs.codes[1:head]
+    return nothing
+end
 
 """
 LOCAL_PAGE_VARS
@@ -44,21 +81,56 @@ Convenience function to allocate default values of page variables. This is calle
 is processed.
 """
 @inline function def_LOCAL_PAGE_VARS!()::Nothing
+    # NOTE `jd_code` is the only page var we KEEP (stays alive)
+    code_scope = get(LOCAL_PAGE_VARS, "jd_code_scope") do
+        Pair(CodeScope(),  (CodeScope,)) # the "Any" is lazy but easy
+    end
     empty!(LOCAL_PAGE_VARS)
-    LOCAL_PAGE_VARS["title"]    = Pair(nothing, (String, Nothing))
-    LOCAL_PAGE_VARS["hasmath"]  = Pair(true,    (Bool,))
-    LOCAL_PAGE_VARS["hascode"]  = Pair(false,   (Bool,))
-    LOCAL_PAGE_VARS["date"]     = Pair(Date(1), (String, Date, Nothing))
-    LOCAL_PAGE_VARS["lang"]     = Pair("julia", (String,)) # default lang for indented code
-    LOCAL_PAGE_VARS["reflinks"] = Pair(true,    (Bool,))   # whether there are reflinks or not
+
+    # Local page vars defaults
+    LOCAL_PAGE_VARS["title"]      = Pair(nothing, (String, Nothing))
+    LOCAL_PAGE_VARS["hasmath"]    = Pair(true,    (Bool,))
+    LOCAL_PAGE_VARS["hascode"]    = Pair(false,   (Bool,))
+    LOCAL_PAGE_VARS["date"]       = Pair(Date(1), (String, Date, Nothing))
+    LOCAL_PAGE_VARS["lang"]       = Pair("julia", (String,)) # default lang for indented code
+    LOCAL_PAGE_VARS["reflinks"]   = Pair(true,    (Bool,))   # whether there are reflinks or not
+    LOCAL_PAGE_VARS["freezecode"] = Pair(false,   (Bool,))   # no-reevaluation of the code
+
+    # RSS 2.0 item specs:
+    # only title, link and description must be defined
+    #
+    #     title       -- rss_title // fallback to title
+    # (*) link        -- [automatically generated]
+    #     description -- rss // rss_description NOTE: if undefined, no item generated
+    #     author      -- rss_author // fallback to author
+    #     category    -- rss_category
+    #     comments    -- rss_comments
+    #     enclosure   -- rss_enclosure
+    # (*) guid        -- [automatically generated from link]
+    #     pubDate     -- rss_pubdate // fallback date // fallback jd_ctime
+    # (*) source      -- [unsupported assumes for now there's only one channel]
+    #
+    LOCAL_PAGE_VARS["rss"]             = Pair("", (String,))
+    LOCAL_PAGE_VARS["rss_description"] = Pair("", (String,))
+    LOCAL_PAGE_VARS["rss_title"]       = Pair("",      (String,))
+    LOCAL_PAGE_VARS["rss_author"]      = Pair("",      (String,))
+    LOCAL_PAGE_VARS["rss_category"]    = Pair("",      (String,))
+    LOCAL_PAGE_VARS["rss_comments"]    = Pair("",      (String,))
+    LOCAL_PAGE_VARS["rss_enclosure"]   = Pair("",      (String,))
+    LOCAL_PAGE_VARS["rss_pubdate"]     = Pair(Date(1), (Date,))
 
     # page vars used by judoc, should not be accessed or defined
     LOCAL_PAGE_VARS["jd_ctime"]  = Pair(Date(1), (Date,))   # time of creation
     LOCAL_PAGE_VARS["jd_mtime"]  = Pair(Date(1), (Date,))   # time of last modification
     LOCAL_PAGE_VARS["jd_rpath"]  = Pair("",      (String,)) # local path to file src/[...]/blah.md
 
+    # Internal vars for code blocks
+    LOCAL_PAGE_VARS["jd_code_scope"] = code_scope
+    LOCAL_PAGE_VARS["jd_code_head"]  = Pair(Ref(0), (Ref{Int},))
+    LOCAL_PAGE_VARS["reeval"]        = Pair(false,  (Bool,)) # whether to always re-evals all on pg
+
     # If there are GLOBAL vars that are defined, they take precedence
-    local_keys   = keys(LOCAL_PAGE_VARS)
+    local_keys = keys(LOCAL_PAGE_VARS)
     for k in keys(GLOBAL_PAGE_VARS)
         k in local_keys || continue
         LOCAL_PAGE_VARS[k] = GLOBAL_PAGE_VARS[k]
@@ -70,10 +142,10 @@ end
 """
 PAGE_HEADERS
 
-Keep track of seen headers. The key amounts to the ordering (~ordered dict), the value contains
-the title, the refstring version of the title, the occurence number and the level (1, ..., 6).
+Keep track of seen headers. The key is the refstring, the value contains the title,
+the occurence number for the first appearance of that title and the level (1, ..., 6).
 """
-const PAGE_HEADERS = Dict{Int,Tuple{AS,AS,Int,Int}}()
+const PAGE_HEADERS = LittleDict{AS,Tuple{AS,Int,Int}}()
 
 """
 $(SIGNATURES)
@@ -126,7 +198,7 @@ GLOBAL_LXDEFS
 List of latex definitions accessible to all pages. This is filled when the config file is read
 (via manager/file_utils/process_config).
 """
-const GLOBAL_LXDEFS = Dict{String, LxDef}()
+const GLOBAL_LXDEFS = LittleDict{String, LxDef}()
 
 
 """
@@ -171,7 +243,6 @@ the site. See [`resolve_lxcom`](@ref).
     return nothing
 end
 
-
 #= ==========================================
 Convenience functions related to the jd_vars
 ============================================= =#
@@ -214,16 +285,6 @@ Given a set of definitions `assignments`, update the variables dictionary `jd_va
 `assignments` that do not match keys in `jd_vars` are ignored (a warning message is displayed).
 The entries in `assignments` are of the form `KEY => STR` where `KEY` is a string key (e.g.:
 "hasmath") and `STR` is an assignment to evaluate (e.g.: "=false").
-
-# Example:
-
-```julia-repl
-julia> d = Dict("a"=>(0.5=>(Real,)), "b"=>("hello"=>(String,)));
-julia> JuDoc.set_vars!(d, ["a"=>"5.0", "b"=>"\"goodbye\""])
-Dict{String,Pair{K,Tuple{DataType}} where K} with 2 entries:
-  "b" => "goodbye"=>(String,)
-  "a" => 5.0=>(Real,)
-```
 """
 function set_vars!(jd_vars::PageVars, assignments::Vector{Pair{String,String}})::PageVars
     # if there's no assignment, cut it short

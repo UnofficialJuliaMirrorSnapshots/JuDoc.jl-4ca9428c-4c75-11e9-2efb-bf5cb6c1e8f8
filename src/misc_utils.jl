@@ -110,15 +110,6 @@ end
 """
 $(SIGNATURES)
 
-Convenience function to check if a variable is `nothing`. It is defined here to guarantee
-compatibility with Julia 1.0 (the function exists for Julia ≥ 1.1).
-"""
-isnothing(x)::Bool = (x === nothing)
-
-
-"""
-$(SIGNATURES)
-
 Convenience function to denote a string as being in a math context in a recursive parsing
 situation. These blocks will be processed as math blocks but without adding KaTeX elements to it
 given that they are part of a larger context that already has KaTeX elements.
@@ -145,7 +136,11 @@ function refstring(s::AS)::String
     st = replace(st, r"[^a-zA-Z0-9_\-\s]" => "")
     # replace spaces by dashes
     st = replace(lowercase(strip(st)), r"\s+" => "_")
-    # in unlikely event we don't have anything here, return the hash of orig string
+    # to avoid clashes with numbering of repeated headers, replace
+    # double underscores by a single one (see convert_header function)
+    st = replace(st, r"__" => "_")
+    # in the unlikely event we don't have anything here, return the hash
+    # of the original string
     isempty(st) && return string(hash(s))
     return st
 end
@@ -186,7 +181,7 @@ these paths can be given to html anchors (refs, img, ...).
 In the `canonical=true` mode, the path is a valid path on the local system. These paths can be
 given to Julia to read or write things.
 """
-function resolve_assets_rpath(rpath::AS; canonical::Bool=false)::String
+function resolve_assets_rpath(rpath::AS; canonical::Bool=false, code::Bool=false)::String
     @assert length(rpath) > 1 "relative path '$rpath' doesn't seem right"
     if startswith(rpath, "/")
         # this is a full path starting from the website root folder so for instance
@@ -196,10 +191,15 @@ function resolve_assets_rpath(rpath::AS; canonical::Bool=false)::String
     elseif startswith(rpath, "./")
         # this is a path relative to the assets folder with the same path as the calling file so
         # for instance if calling from `src/pages/pg1.md` with `./im1.png` it would refer to
-        # /assets/pages/im1.png
+        # /assets/pages/pg1/im1.png
         @assert length(rpath) > 2 "relative path '$rpath' doesn't seem right"
-        canonical || return "/assets/" * unixify(dirname(CUR_PATH[])) * rpath[3:end]
-        return normpath(joinpath(PATHS[:assets], dirname(CUR_PATH[]), joinrp(rpath[3:end])))
+        canonical || return "/assets/" * unixify(splitext(CUR_PATH[])[1]) * rpath[3:end]
+        return normpath(joinpath(PATHS[:assets], splitext(CUR_PATH[])[1], joinrp(rpath[3:end])))
+    end
+    if code
+        # in the code mode we allow a short, this: `julia:ex` is considered
+        # short for `julia:./code/ex`
+        return resolve_assets_rpath("./code/" * rpath; canonical=canonical)
     end
     # this is a full path relative to the assets folder for instance `blah/img1.png` would
     # correspond to `/assets/blah/img1.png`

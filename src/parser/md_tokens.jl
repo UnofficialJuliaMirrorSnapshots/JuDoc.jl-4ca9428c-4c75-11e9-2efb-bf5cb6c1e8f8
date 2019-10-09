@@ -4,7 +4,7 @@ MD_1C_TOKENS
 Dictionary of single-char tokens for Markdown. Note that these characters are exclusive, they
 cannot appear again in a larger token.
 """
-const MD_1C_TOKENS = Dict{Char, Symbol}(
+const MD_1C_TOKENS = LittleDict{Char, Symbol}(
     '{'  => :LXB_OPEN,
     '}'  => :LXB_CLOSE,
     '\n' => :LINE_RETURN,
@@ -17,7 +17,7 @@ MD_TOKENS_LX
 
 Subset of `MD_1C_TOKENS` with only the latex tokens (for parsing what's in a math environment).
 """
-const MD_1C_TOKENS_LX = Dict{Char, Symbol}(
+const MD_1C_TOKENS_LX = LittleDict{Char, Symbol}(
     '{'  => :LXB_OPEN,
     '}'  => :LXB_CLOSE
     )
@@ -29,7 +29,7 @@ MD_TOKENS
 Dictionary of tokens for Markdown. Note that for each, there may be several possibilities to
 consider in which case the order is important: the first case that works will be taken.
 """
-const MD_TOKENS = Dict{Char, Vector{TokenFinder}}(
+const MD_TOKENS = LittleDict{Char, Vector{TokenFinder}}(
     '<'  => [ isexactly("<!--") => :COMMENT_OPEN,     # <!-- ...
              ],
     '-'  => [ isexactly("-->")  => :COMMENT_CLOSE,    #      ... -->
@@ -127,10 +127,11 @@ indentation (either a quadruple space or a tab).
 """
 const L_RETURNS = (:LINE_RETURN, :LR_INDENT)
 
+
 """
 MD_OCB
 
-Dictionary of Open-Close Blocks whose content should be deactivated (any token within their span
+List of Open-Close Blocks whose content should be deactivated (any token within their span
 should be marked as inactive) until further processing.
 The keys are identifier for the type of block, the value is a pair with the opening and closing
 tokens followed by a boolean indicating whether the content of the block should be reprocessed.
@@ -149,8 +150,8 @@ const MD_OCB = [
     OCProto(:CODE_INLINE,     :CODE_DOUBLE,  (:CODE_DOUBLE,),   false),
     OCProto(:CODE_INLINE,     :CODE_SINGLE,  (:CODE_SINGLE,),   false),
     OCProto(:ESCAPE,          :ESCAPE,       (:ESCAPE,),        false),
-    OCProto(:FOOTNOTE_DEF,    :FOOTNOTE_DEF, (:LINE_RETURN,),   false),
-    OCProto(:LINK_DEF,        :LINK_DEF,     (:LINE_RETURN,),   false),
+    OCProto(:FOOTNOTE_DEF,    :FOOTNOTE_DEF, (L_RETURNS..., :EOS), false),
+    OCProto(:LINK_DEF,        :LINK_DEF,     (L_RETURNS..., :EOS), false),
     # ------------------------------------------------------------------
     OCProto(:H1,              :H1_OPEN,      (L_RETURNS..., :EOS), false), # see [^3]
     OCProto(:H2,              :H2_OPEN,      (L_RETURNS..., :EOS), false),
@@ -170,6 +171,7 @@ where a user defines a latex command like so: \newcommand{\section}{# blah} (no 
 def are allowed.
 * ordering matters!
 =#
+
 
 """
 MD_HEADER
@@ -204,6 +206,7 @@ const MD_OCB_MATH = [
     OCProto(:MATH_ALIGN, :MATH_ALIGN_OPEN, (:MATH_ALIGN_CLOSE,), false),
     OCProto(:MATH_EQA,   :MATH_EQA_OPEN,   (:MATH_EQA_CLOSE,),   false),
     ]
+
 
 """
 MD_OCB_ALL

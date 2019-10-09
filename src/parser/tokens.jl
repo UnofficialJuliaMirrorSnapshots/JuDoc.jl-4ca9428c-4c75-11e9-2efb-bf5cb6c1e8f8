@@ -218,7 +218,7 @@ function _is_language(i::Int, c::Char)
     return α(c, ('-',))        # can be a letter or a hyphen, for instance ```objective-c
 end
 
-_validate_language(stack::AS) = match(r"^```[a-zA-Z]", stack) !== nothing
+_validate_language(stack::AS) = !isnothing(match(r"^```[a-zA-Z]", stack))
 
 
 """
@@ -234,7 +234,7 @@ function _is_language2(i::Int, c::Char)
     return α(c, ('-',))
 end
 
-_validate_language2(stack::AS) = match(r"^`````[a-zA-Z]", stack) !== nothing
+_validate_language2(stack::AS) = !isnothing(match(r"^`````[a-zA-Z]", stack))
 
 
 """
@@ -279,8 +279,8 @@ that match specific tokens. The list of tokens found is returned.
 * `stokens_dict`: dictionaro of possible tokens (single character)
 """
 function find_tokens(str::AS,
-                     tokens_dict::Dict{Char,Vector{TokenFinder}},
-                     stokens_dict::Dict{Char,Symbol})::Vector{Token}
+                     tokens_dict::AbstractDict{Char,Vector{TokenFinder}},
+                     stokens_dict::AbstractDict{Char,Symbol})::Vector{Token}
     # storage to keep track of the tokens found
     tokens = Vector{Token}()
 
@@ -339,7 +339,7 @@ function find_tokens(str::AS,
                     if endchar_idx > head_idx
                         # if the validator is unhappy, don't move the head and
                         # consider other rules
-                        ν === nothing || ν(stack) || continue
+                        isnothing(ν) || ν(stack) || continue
                         # otherwise move ahead after the match
                         push!(tokens, Token(case, stack))
                         head_idx = endchar_idx

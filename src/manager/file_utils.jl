@@ -23,14 +23,13 @@ $(SIGNATURES)
 Take a path to an input markdown file (via `root` and `file`), then construct the appropriate HTML
 page (inserting `head`, `pg_foot` and `foot`) and finally write it at the appropriate place.
 """
-function write_page(root::String, file::String, head::String, pg_foot::String, foot::String;
+function write_page(root::String, file::String, head::String,
+                    pg_foot::String, foot::String;
                     prerender::Bool=false, isoptim::Bool=false)::Nothing
-    # 0. create a dictionary with all the variables available to the page
     # 1. read the markdown into string, convert it and extract definitions
     # 2. eval the definitions and update the variable dictionary, also retrieve
     # document variables (time of creation, time of last modif) and add those
     # to the dictionary.
-    jd_vars = merge(GLOBAL_PAGE_VARS, copy(LOCAL_PAGE_VARS))
     fpath   = joinpath(root, file)
      # The curpath is the relative path starting after /src/ so for instance:
      # f1/blah/page1.md or index.md etc... this is useful in the code evaluation and management
@@ -38,6 +37,13 @@ function write_page(root::String, file::String, head::String, pg_foot::String, f
     CUR_PATH[] = fpath[lastindex(PATHS[:src])+length(PATH_SEP)+1:end]
 
     (content, jd_vars) = convert_md(read(fpath, String) * EOS, collect(values(GLOBAL_LXDEFS)))
+
+    # Check for RSS elements
+    if GLOBAL_PAGE_VARS["generate_rss"].first && FULL_PASS[] &&
+        !all(e -> e |> first |> isempty, (jd_vars["rss"], jd_vars["rss_description"]))
+        # add item to RSSDICT
+        add_rss_item(jd_vars)
+    end
 
     # adding document variables to the dictionary
     # note that some won't change and so it's not necessary to do this every time
@@ -119,8 +125,8 @@ function process_file_err(case::Symbol, fpair::Pair{String, String}, head::AS=""
         write(joinpath(out_path(fpair.first), fpair.second), proc_html)
     elseif case == :other
         opath = joinpath(out_path(fpair.first), fpair.second)
-        # only copy it again if necessary (particularly relevant when the asset files
-        # take quite a bit of space.
+        # only copy it again if necessary (particularly relevant when the asset
+        # files take quite a bit of space.
         if clear || !isfile(opath) || mtime(opath) < t
             cp(joinpath(fpair...), opath, force=true)
         end
@@ -132,6 +138,7 @@ function process_file_err(case::Symbol, fpair::Pair{String, String}, head::AS=""
                 force=true)
         end
     end
+    FULL_PASS[] || print(rpad("\r→ page updated [✓]", 79)*"\r")
     return nothing
 end
 
@@ -151,16 +158,3 @@ Convenience function to assemble the html out of its parts.
 """
 build_page(head::String, content::String, pg_foot::String, foot::String)::String =
     "$head\n<div class=\"jd-content\">\n$content\n$pg_foot\n</div>\n$foot"
-
-
-"""
-$(SIGNATURES)
-
-for a project website, for instance `username.github.io/project/` all paths should eventually
-be pre-prended with `/project/`. This would happen just before you publish the website.
-"""
-function fix_links(pg::String)::String
-    pp = strip(GLOBAL_PAGE_VARS["prepath"].first, '/')
-    ss = SubstitutionString("\\1=\"/$(pp)/")
-    return replace(pg, r"(src|href)\s*?=\s*?\"\/" => ss)
-end
