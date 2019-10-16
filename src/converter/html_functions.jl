@@ -5,7 +5,7 @@ Helper function to process an individual block when it's a `HFun` such as `{{ fi
 Dev Note: `fpath` is (currently) unused but is passed to all `convert_html_block` functions.
 See [`convert_html`](@ref).
 """
-function convert_html_block(β::HFun, allvars::PageVars, ::AS="")::String
+function convert_html_fblock(β::HFun, allvars::PageVars, ::AS="")::String
     # normalise function name and apply the function
     fn = lowercase(β.fname)
     haskey(HTML_FUNCTIONS, fn) && return HTML_FUNCTIONS[fn](β.params, allvars)
@@ -104,9 +104,11 @@ The split is as follows:
 function hfun_toc()::String
     isempty(PAGE_HEADERS) && return ""
     inner   = ""
-    baselvl = minimum(h[3] for h in values(PAGE_HEADERS)) - 1
+    headers = filter(p -> p.second[3] ≥ GLOBAL_PAGE_VARS["mintoclevel"].first,
+                     PAGE_HEADERS)
+    baselvl = minimum(h[3] for h in values(headers)) - 1
     curlvl  = baselvl
-    for (rs, h) ∈ PAGE_HEADERS
+    for (rs, h) ∈ headers
         lvl = h[3]
         if lvl ≤ curlvl
             # Close previous list item

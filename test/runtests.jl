@@ -1,4 +1,4 @@
-using JuDoc, Test, Markdown, Dates, Random
+using JuDoc, Test, Markdown, Dates, Random, Literate
 const J = JuDoc
 const D = joinpath(dirname(dirname(pathof(JuDoc))), "test", "_dummies")
 
@@ -20,9 +20,6 @@ include("parser/markdown+latex.jl")
 include("parser/markdown-extra.jl")
 include("parser/footnotes.jl")
 println("🍺")
-println("PARSER/HTML")
-include("parser/html.jl")
-println("🍺")
 
 # CONVERTER folder
 println("CONVERTER/MD")
@@ -33,15 +30,17 @@ include("converter/hyperref.jl")
 println("🍺")
 println("CONVERTER/HTML")
 include("converter/html.jl")
+include("converter/html2.jl")
 println("🍺")
-
-println("CONVERTER/LX")
+println("CONVERTER/EVAL")
 include("converter/eval.jl")
+println("🍺")
+println("CONVERTER/LX")
 include("converter/lx_input.jl")
 include("converter/lx_simple.jl")
 println("🍺")
 
-println("INTEGRATION")
+println("GLOBAL")
 include("global/cases1.jl")
 include("global/cases2.jl")
 include("global/ordering.jl")
@@ -65,5 +64,13 @@ begin
 end
 cd(dirname(dirname(pathof(JuDoc))))
 
+println("INTEGRATION")
+include("integration/literate.jl")
+
 flush_td()
+cd(joinpath(dirname(dirname(pathof(JuDoc)))))
+
+println("COVERAGE")
+include("coverage/extras1.jl")
+
 println("😅 😅 😅 😅")

@@ -205,7 +205,7 @@ $(SIGNATURES)
 Internal function to read the content of a script file. See also [`resolve_lx_input`](@ref).
 """
 function resolve_lx_input_hlcode(rpath::AS, lang::AS)::String
-    fpath, _, _ = check_input_rpath(rpath; code=true)
+    fpath, = check_input_rpath(rpath; code=true)
     # Read the file while ignoring lines that are flagged with something like `# HIDE`
     _, comsym = CODE_LANG[lang]
     hide = Regex(raw"(?:^|[^\S\r\n]*?)#(\s)*?(?i)hide(all)?")
@@ -228,10 +228,15 @@ function resolve_lx_input_hlcode(rpath::AS, lang::AS)::String
 
         end
     end
-    hideall && take!(io_in) # discard the content
+    hideall && take!(io_in)     # discard the content
     code = String(take!(io_in))
+    isempty(code) && return ""
     endswith(code, "\n") && (code = chop(code, tail=1))
-    return html_code(code, lang)
+    html = html_code(code, lang)
+    if LOCAL_PAGE_VARS["showall"].first
+        html *= show_res(rpath)
+    end
+    return html
 end
 
 
@@ -242,10 +247,53 @@ Internal function to read the content of a script file and highlight it using `h
 also [`resolve_lx_input`](@ref).
 """
 function resolve_lx_input_othercode(rpath::AS, lang::AS)::String
-    fpath, _, _ = check_input_rpath(rpath, code=true)
+    fpath, = check_input_rpath(rpath, code=true)
     return html_code(read(fpath, String), lang)
 end
 
+
+"""
+$SIGNATURES
+
+Internal function to check if a code should suppress the final show.
+"""
+function check_suppress_show(code::AS)
+    scode = strip(code)
+    scode[end] == ';' && return true
+    # last line ?
+    lastline = scode
+    i = findlast(e -> e in (';','\n'), scode)
+    if !isnothing(i)
+        lastline = strip(scode[nextind(scode, i):end])
+    end
+    startswith(lastline, "@show ")   && return true
+    startswith(lastline, "println(") && return true
+    startswith(lastline, "print(")   && return true
+    return false
+end
+
+
+"""
+$SIGNATURES
+
+Internal function to read a result file and show it.
+"""
+function show_res(rpath::AS)::String
+    fpath, = check_input_rpath(rpath; code=true)
+    fd, fn = splitdir(fpath)
+    stdo   = read(joinpath(fd, "output", splitext(fn)[1] * ".out"), String)
+    res    = read(joinpath(fd, "output", splitext(fn)[1] * ".res"), String)
+    # check if there's a final `;` or if the last line is a print, println or show
+    # in those cases, ignore the result file
+    code = strip(read(splitext(fpath)[1] * ".jl", String))
+    check_suppress_show(code) && (res = "")
+    if !isempty(stdo)
+        endswith(stdo, "\n") || (stdo *= "\n")
+    end
+    res == "nothing" && (res = "")
+    isempty(stdo) && isempty(res) && return ""
+    return html_div("code_output", html_code(stdo * res))
+end
 
 """
 $(SIGNATURES)
@@ -259,9 +307,11 @@ function resolve_lx_input_plainoutput(rpath::AS, reproc::Bool=false; code::Bool=
     out_file = joinpath(dir, "output", fname * ".out")
     # check if the output file exists
     isfile(out_file) || throw(ErrorException("I found an \\input but no relevant output file."))
-    # return the content in a pre block
-    reproc || return html_code(read(out_file, String))
-    return read(out_file, String) * EOS
+    # return the content in a pre block (if non empty)
+    content = read(out_file, String)
+    isempty(content) && return ""
+    reproc || return html_code(content)
+    return content * EOS
 end
 
 
@@ -277,7 +327,9 @@ function resolve_lx_input_textfile(rpath::AS)::String
     fpath = resolve_assets_rpath(rpath; canonical=true)
     isempty(splitext(fpath)[2]) && (fpath *= ".md")
     isfile(fpath) || throw(ErrorException("I found a \\textinput but no relevant file."))
-    return read(fpath, String) * EOS
+    content = read(fpath, String)
+    isempty(content) && return ""
+    return content * EOS
 end
 
 
