@@ -57,3 +57,41 @@ end
         <h2 id="done"><a href="/pub/ff/aa.html#done">Done</a></h2>done.
         """)
 end
+
+@testset "TOC"  begin
+    J.CUR_PATH[] = "pages/ff/aa.md"
+    s = raw"""
+        @def mintoclevel = 2
+        @def maxtoclevel = 3
+        \toc
+        # A
+        ## B
+        #### C
+        ### D
+        ## E
+        ### F
+        done.
+        """ |> seval
+    @test isapproxstr(s, raw"""
+        <div class="jd-toc">
+            <ol>
+                <li><a href="/pub/ff/aa.html#b">B</a>
+                    <ol>
+                        <li><a href="/pub/ff/aa.html#d">D</a></li>
+                    </ol>
+                </li>
+                <li><a href="/pub/ff/aa.html#e">E</a>
+                    <ol>
+                        <li><a href="/pub/ff/aa.html#f">F</a></li>
+                    </ol>
+                </li>
+            </ol>
+        </div>
+        <h1 id="a"><a href="/pub/ff/aa.html#a">A</a></h1>
+        <h2 id="b"><a href="/pub/ff/aa.html#b">B</a></h2>
+        <h4 id="c"><a href="/pub/ff/aa.html#c">C</a></h4>
+        <h3 id="d"><a href="/pub/ff/aa.html#d">D</a></h3>
+        <h2 id="e"><a href="/pub/ff/aa.html#e">E</a></h2>
+        <h3 id="f"><a href="/pub/ff/aa.html#f">F</a></h3> done.
+        """)
+end

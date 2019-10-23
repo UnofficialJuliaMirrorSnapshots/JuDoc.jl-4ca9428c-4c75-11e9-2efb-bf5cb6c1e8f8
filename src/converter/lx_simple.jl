@@ -62,7 +62,10 @@ function resolve_lx_literate(lxc::LxCom)::String
             set_var!(LOCAL_PAGE_VARS, "freezecode", true)
         end
     end
-    # if haschanged=true then this will be handled cell by cell
+    if haschanged && FULL_PASS[]
+        set_var!(LOCAL_PAGE_VARS, "reeval", true)
+    end
+    # if haschanged=true and not full pass then this will be handled cell by cell
     # comparing with cell files following `eval_and_resolve_code`
     return read(opath, String) * EOS
 end
@@ -184,6 +187,17 @@ function resolve_lx_file(lxc::LxCom)::String
     return html_err("file matching '$path' not found")
 end
 
+"""
+$SIGNATURES
+
+Internal function to resolve a `\\toc` or `\\tableofcontents`.
+"""
+function insert_toc(::LxCom)::String
+    minlevel = LOCAL_PAGE_VARS["mintoclevel"].first
+    maxlevel = LOCAL_PAGE_VARS["maxtoclevel"].first
+    return "{{toc $minlevel $maxlevel}}"
+end
+
 
 """
 $SIGNATURES
@@ -197,6 +211,8 @@ const LXCOM_SIMPLE = LittleDict{String, Function}(
     "\\file"   => resolve_lx_file,    # include a file
     "\\tableinput" => resolve_lx_tableinput,    # include table from a csv file
     "\\show"   => resolve_lx_show,    # show result of a code block
+    "\\toc"    => insert_toc,
+    "\\tableofcontents" => insert_toc,
     )
 
 
