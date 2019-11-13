@@ -38,6 +38,8 @@ function convert_md(mds::String, pre_lxdefs::Vector{LxDef}=Vector{LxDef}();
     tokens  = find_tokens(mds, MD_TOKENS, MD_1C_TOKENS)
     # distinguish fnref/fndef
     validate_footnotes!(tokens)
+    # ignore header tokens that are not at the start of a line
+    validate_headers!(tokens)
     #> 1b. Find indented blocks
     tokens = find_indented_blocks(tokens, mds)
 
@@ -50,8 +52,6 @@ function convert_md(mds::String, pre_lxdefs::Vector{LxDef}=Vector{LxDef}();
     filter_indented_blocks!(blocks)
     #>> c. now that blocks have been found, line-returns can be dropped
     filter!(τ -> τ.name ∉ L_RETURNS, tokens)
-    #>> d. filter out "fake headers" (opening ### that are not at the start of a line)
-    filter!(β -> validate_header_block(β), blocks)
     #>> e. keep track of literal content of possible link definitions to use
     validate_and_store_link_defs!(blocks)
 
@@ -61,7 +61,7 @@ function convert_md(mds::String, pre_lxdefs::Vector{LxDef}=Vector{LxDef}();
     #>> b. if any lxdefs are given in the context, merge them. `pastdef` specifies
     # that the definitions appeared "earlier"
     lprelx = length(pre_lxdefs)
-    (lprelx > 0) && (lxdefs = cat(pastdef(pre_lxdefs), lxdefs, dims=1))
+    (lprelx > 0) && (lxdefs = cat(pastdef.(pre_lxdefs), lxdefs, dims=1))
     #>> c. find latex commands
     lxcoms, _ = find_md_lxcoms(tokens, lxdefs, braces)
 
@@ -334,7 +334,7 @@ $(SIGNATURES)
 
 Convenience function to process markdown definitions `@def ...` as appropriate. Return a dictionary
 of local page variables or nothing in the case of the config file (which updates globally
-available page variable dictionaries).
+available page variable dictionaries and also the latex definitions).
 
 **Arguments**
 
@@ -364,7 +364,7 @@ function process_md_defs(blocks::Vector{OCBlock}, isconfig::Bool,
     if isconfig
         isempty(assignments) || set_vars!(GLOBAL_PAGE_VARS, assignments)
         for lxd ∈ lxdefs
-            GLOBAL_LXDEFS[lxd.name] = lxd
+            GLOBAL_LXDEFS[lxd.name] = pastdef(lxd)
         end
         return nothing
     end

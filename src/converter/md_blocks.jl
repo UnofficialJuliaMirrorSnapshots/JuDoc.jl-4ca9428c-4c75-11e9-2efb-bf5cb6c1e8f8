@@ -9,14 +9,14 @@ function convert_block(β::AbstractBlock, lxcontext::LxContext)::AS
     β isa HTML_SPCH     && return ifelse(isempty(β.r), β.ss, β.r)
     # Return relevant interpolated string based on case
     βn = β.name
-    βn ∈ MD_HEADER         && return convert_header(β)
+    βn ∈ MD_HEADER         && return convert_header(β, lxcontext.lxdefs)
     βn == :CODE_INLINE     && return html_code_inline(content(β) |> htmlesc)
     βn == :CODE_BLOCK_LANG && return convert_code_block(β.ss)
     βn == :CODE_BLOCK_IND  && return convert_indented_code_block(β.ss)
     βn == :CODE_BLOCK      && return html_code(strip(content(β)), "{{fill lang}}")
     βn == :ESCAPE          && return chop(β.ss, head=3, tail=3)
     βn == :FOOTNOTE_REF    && return convert_footnote_ref(β)
-    βn == :FOOTNOTE_DEF    && return convert_footnote_def(β, lxcontext)
+    βn == :FOOTNOTE_DEF    && return convert_footnote_def(β, lxcontext.lxdefs)
     βn == :LINK_DEF        && return ""
 
     # Math block --> needs to call further processing to resolve possible latex
@@ -102,9 +102,10 @@ $(SIGNATURES)
 
 Helper function for the case of a header block (H1, ..., H6).
 """
-function convert_header(β::OCBlock)::String
+function convert_header(β::OCBlock, lxdefs::Vector{LxDef})::String
     hk       = lowercase(string(β.name)) # h1, h2, ...
-    title, _ = convert_md(content(β) * EOS; isrecursive=true, has_mddefs=false)
+    title, _ = convert_md(content(β) * EOS, lxdefs;
+                          isrecursive=true, has_mddefs=false)
     rstitle  = refstring(title)
     # check if the header has appeared before and if so suggest
     # an altered refstring; if that altered refstring also exist
@@ -172,7 +173,7 @@ function eval_and_resolve_code(code::AS, rpath::AS;
     end
 
     write(path, MESSAGE_FILE_GEN_JMD * code)
-    print(rpad("\r→ evaluating code [...] ($(CUR_PATH[]), $rpath)", 79) * "\r")
+    SILENT_MODE[] || print(rpad("\r→ evaluating code [...] ($(CUR_PATH[]), $rpath)", 79) * "\r")
     # - execute the code while redirecting stdout to file
     Logging.disable_logging(Logging.LogLevel(3_000))
     res = nothing
@@ -191,7 +192,7 @@ function eval_and_resolve_code(code::AS, rpath::AS;
         end
     end
     Logging.disable_logging(Logging.Debug)
-    print(rpad("\r→ evaluating code [✓]", 79) * "\r")
+    SILENT_MODE[] || print(rpad("\r→ evaluating code [✓]", 79) * "\r")
 
     # resolve the code block (highlighting) and return it
     return resolve_lx_input_hlcode(rpath, "julia")
@@ -330,7 +331,7 @@ $(SIGNATURES)
 
 Helper function to convert a `[^1]: ...` into a html table for the def.
 """
-function convert_footnote_def(β::OCBlock, lxcontext::LxContext)::String
+function convert_footnote_def(β::OCBlock, lxdefs::Vector{LxDef})::String
     # otok(β) is [^id]:
     id = match(r"\[\^(.*?)\]:", otok(β).ss).captures[1]
     pos = 0
@@ -345,7 +346,7 @@ function convert_footnote_def(β::OCBlock, lxcontext::LxContext)::String
         return ""
     end
     # need to process the content which could contain stuff
-    ct, _ = convert_md(content(β) * EOS, lxcontext.lxdefs;
+    ct, _ = convert_md(content(β) * EOS, lxdefs;
                        isrecursive=true, has_mddefs=false)
     """
     <table class="fndef" id="fndef:$id">
